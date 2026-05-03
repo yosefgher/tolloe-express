@@ -1,0 +1,24 @@
+{
+  "nav": {
+    "track": "ይከታተሉ",
+    "book": "ጭነት ያስያዙ",
+    "calculate": "ዋጋ ያሰሉ",
+    "services": "አገልግሎቶች",
+    "coverage": "ሽፋን",
+    "about": "ስለ እኛ",
+    "contact": "ያግኙን",
+    "blog": "ብሎግ",
+    "login": "ግባ",
+    "register": "ጀምር",
+    "dashboard": "ዳሽቦርድ"
+  },
+  "hero": {
+    "tagline": "የኢትዮጵያ አስተማማኝ ኩሪዬ",
+    "title": "ፈጣን፣ አስተማማኝ፣ ሀገር አቀፍ ዳሊቨሪ",
+    "subtitle": "ከአዲስ አበባ እስከ ኢትዮጵያ ዳርቻ — አስፈላጊ የሆነውን ነገር እናደርሳለን።",
+    "track_placeholder": "የትራኪንግ ቁጥር ያስገቡ",
+    "track_btn": "ጭነት ይከታተሉ",
+    "book_btn": "ጭነት ያስያዙ",
+    "calculate_btn": "ዋጋ ያግኙ"
+  }
+}

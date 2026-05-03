@@ -1,0 +1,43 @@
+{
+  "nav": {
+    "track": "Track",
+    "book": "Book Shipment",
+    "calculate": "Price Calculator",
+    "services": "Services",
+    "coverage": "Coverage",
+    "about": "About Us",
+    "contact": "Contact",
+    "blog": "Blog",
+    "login": "Log In",
+    "register": "Get Started",
+    "dashboard": "Dashboard"
+  },
+  "hero": {
+    "tagline": "Ethiopia's Trusted Courier",
+    "title": "Fast. Reliable. Nationwide Delivery",
+    "subtitle": "From Addis Ababa to every corner of Ethiopia — we deliver what matters most.",
+    "track_placeholder": "Enter tracking number (e.g. TE-20260503-A7K2PQ)",
+    "track_btn": "Track Package",
+    "book_btn": "Book a Shipment",
+    "calculate_btn": "Get a Quote"
+  },
+  "stats": {
+    "cities": "Cities Covered",
+    "deliveries": "Deliveries Monthly",
+    "satisfaction": "Customer Satisfaction",
+    "support": "Hour Support"
+  },
+  "services": {
+    "title": "Our Services",
+    "same_day": "Same-Day",
+    "express": "Express",
+    "standard": "Standard",
+    "economy": "Economy"
+  },
+  "footer": {
+    "company": "Company",
+    "services": "Services",
+    "support": "Support",
+    "rights": "All rights reserved"
+  }
+}

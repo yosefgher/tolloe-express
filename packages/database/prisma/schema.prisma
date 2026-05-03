@@ -1,0 +1,508 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  STAFF
+  CUSTOMER
+  BUSINESS_CLIENT
+}
+
+enum ShipmentStatus {
+  PENDING
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum ServiceType {
+  SAME_DAY
+  EXPRESS
+  STANDARD
+  ECONOMY
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  BANK_TRANSFER
+  MOBILE_MONEY
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum NotifChannel {
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotifStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum UploadStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum VehicleType {
+  MOTORCYCLE
+  CAR
+  VAN
+  TRUCK
+}
+
+enum WebhookEvent {
+  SHIPMENT_CREATED
+  SHIPMENT_UPDATED
+  SHIPMENT_DELIVERED
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  passwordHash           String
+  role                   Role      @default(CUSTOMER)
+  phone                  String?
+  isActive               Boolean   @default(true)
+  isEmailVerified        Boolean   @default(false)
+  emailVerificationToken String?
+  passwordResetToken     String?
+  passwordResetExpires   DateTime?
+  refreshToken           String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  profile         Profile?
+  addresses       Address[]
+  sentShipments   Shipment[]     @relation("SentShipments")
+  receivedShipments Shipment[]   @relation("ReceivedShipments")
+  businessClient  BusinessClient?
+  driverProfile   Driver?
+  trackingEvents  TrackingEvent[]
+  blogPosts       BlogPost[]
+  notifications   Notification[]
+  bulkUploads     BulkUpload[]
+  cashSessions       CashSession[]  @relation("StaffCashSessions")
+  processedShipments Shipment[]     @relation("ProcessedShipments")
+  auditLogs          AuditLog[]
+
+  @@map("users")
+}
+
+// ─── Profile ──────────────────────────────────────────────────────────────────
+
+model Profile {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  firstName String
+  lastName  String
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+// ─── Address ──────────────────────────────────────────────────────────────────
+
+model Address {
+  id         String  @id @default(cuid())
+  userId     String
+  label      String  @default("Home")
+  street     String
+  city       String
+  region     String
+  country    String  @default("Ethiopia")
+  postalCode String?
+  lat        Float?
+  lng        Float?
+  isDefault  Boolean @default(false)
+  createdAt  DateTime @default(now())
+
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pickupShipments   Shipment[] @relation("PickupAddress")
+  deliveryShipments Shipment[] @relation("DeliveryAddress")
+
+  @@map("addresses")
+}
+
+// ─── BusinessClient ───────────────────────────────────────────────────────────
+
+model BusinessClient {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  companyName   String
+  taxId         String?
+  contractType  String   @default("standard")
+  creditLimit   Decimal  @default(0) @db.Decimal(12, 2)
+  billingCycle  String   @default("monthly")
+  isApproved    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  apiKeys     ApiKey[]
+  webhooks    Webhook[]
+  shipments   Shipment[]
+  bulkUploads BulkUpload[]
+
+  @@map("business_clients")
+}
+
+// ─── ApiKey ───────────────────────────────────────────────────────────────────
+
+model ApiKey {
+  id               String   @id @default(cuid())
+  businessClientId String
+  name             String
+  key              String   @unique
+  lastUsedAt       DateTime?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  businessClient BusinessClient @relation(fields: [businessClientId], references: [id], onDelete: Cascade)
+
+  @@map("api_keys")
+}
+
+// ─── Webhook ──────────────────────────────────────────────────────────────────
+
+model Webhook {
+  id               String         @id @default(cuid())
+  businessClientId String
+  url              String
+  events           WebhookEvent[]
+  secret           String
+  isActive         Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+
+  businessClient BusinessClient @relation(fields: [businessClientId], references: [id], onDelete: Cascade)
+
+  @@map("webhooks")
+}
+
+// ─── Driver ───────────────────────────────────────────────────────────────────
+
+model Driver {
+  id           String      @id @default(cuid())
+  userId       String      @unique
+  vehicleType  VehicleType @default(MOTORCYCLE)
+  licenseNumber String
+  vehiclePlate String
+  isAvailable  Boolean     @default(true)
+  currentLat   Float?
+  currentLng   Float?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shipments Shipment[]
+
+  @@map("drivers")
+}
+
+// ─── Shipment ─────────────────────────────────────────────────────────────────
+
+model Shipment {
+  id                String         @id @default(cuid())
+  trackingNumber    String         @unique
+  status            ShipmentStatus @default(PENDING)
+  serviceType       ServiceType    @default(STANDARD)
+  weight            Decimal        @db.Decimal(8, 2)
+  length            Decimal?       @db.Decimal(8, 2)
+  width             Decimal?       @db.Decimal(8, 2)
+  height            Decimal?       @db.Decimal(8, 2)
+  totalPrice        Decimal        @db.Decimal(12, 2)
+  isCOD             Boolean        @default(false)
+  codAmount         Decimal?       @db.Decimal(12, 2)
+  notes             String?
+  estimatedDelivery DateTime?
+  actualDelivery    DateTime?
+  senderId          String
+  recipientId       String
+  businessClientId  String?
+  driverId          String?
+  pickupAddressId   String
+  deliveryAddressId String
+  promoCodeId       String?
+  bulkUploadId      String?
+  counterId         String?
+  cashSessionId     String?
+  processedById     String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  sender          User            @relation("SentShipments", fields: [senderId], references: [id])
+  recipient       User            @relation("ReceivedShipments", fields: [recipientId], references: [id])
+  businessClient  BusinessClient? @relation(fields: [businessClientId], references: [id])
+  driver          Driver?         @relation(fields: [driverId], references: [id])
+  pickupAddress   Address         @relation("PickupAddress", fields: [pickupAddressId], references: [id])
+  deliveryAddress Address         @relation("DeliveryAddress", fields: [deliveryAddressId], references: [id])
+  promoCode       PromoCode?      @relation(fields: [promoCodeId], references: [id])
+  bulkUpload      BulkUpload?     @relation(fields: [bulkUploadId], references: [id])
+
+  trackingEvents  TrackingEvent[]
+  payment         Payment?
+  proofOfDelivery ProofOfDelivery?
+  counter         Counter?        @relation(fields: [counterId], references: [id])
+  cashSession     CashSession?    @relation(fields: [cashSessionId], references: [id])
+  processedBy     User?           @relation("ProcessedShipments", fields: [processedById], references: [id])
+
+  @@index([trackingNumber])
+  @@index([senderId])
+  @@index([status])
+  @@map("shipments")
+}
+
+// ─── TrackingEvent ────────────────────────────────────────────────────────────
+
+model TrackingEvent {
+  id         String         @id @default(cuid())
+  shipmentId String
+  status     ShipmentStatus
+  location   String?
+  notes      String?
+  staffId    String?
+  timestamp  DateTime       @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  staff    User?    @relation(fields: [staffId], references: [id])
+
+  @@index([shipmentId])
+  @@map("tracking_events")
+}
+
+// ─── Payment ──────────────────────────────────────────────────────────────────
+
+model Payment {
+  id             String        @id @default(cuid())
+  shipmentId     String        @unique
+  amount         Decimal       @db.Decimal(12, 2)
+  currency       String        @default("ETB")
+  method         PaymentMethod @default(CASH)
+  status         PaymentStatus @default(PENDING)
+  transactionRef String?
+  paidAt         DateTime?
+  createdAt      DateTime      @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+// ─── ProofOfDelivery ──────────────────────────────────────────────────────────
+
+model ProofOfDelivery {
+  id           String   @id @default(cuid())
+  shipmentId   String   @unique
+  receiverName String
+  signatureUrl String?
+  photoUrl     String?
+  notes        String?
+  deliveredAt  DateTime @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@map("proof_of_deliveries")
+}
+
+// ─── Notification ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id          String      @id @default(cuid())
+  userId      String
+  channel     NotifChannel
+  subject     String
+  body        String
+  status      NotifStatus @default(PENDING)
+  referenceId String?
+  sentAt      DateTime?
+  createdAt   DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─── PromoCode ────────────────────────────────────────────────────────────────
+
+model PromoCode {
+  id            String       @id @default(cuid())
+  code          String       @unique
+  discountType  DiscountType @default(PERCENTAGE)
+  discountValue Decimal      @db.Decimal(8, 2)
+  maxUses       Int?
+  usedCount     Int          @default(0)
+  expiresAt     DateTime?
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+
+  shipments Shipment[]
+
+  @@map("promo_codes")
+}
+
+// ─── BlogPost ─────────────────────────────────────────────────────────────────
+
+model BlogPost {
+  id            String    @id @default(cuid())
+  title         String
+  slug          String    @unique
+  excerpt       String
+  content       String
+  coverImageUrl String?
+  authorId      String
+  publishedAt   DateTime?
+  tags          String[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  author User @relation(fields: [authorId], references: [id])
+
+  @@map("blog_posts")
+}
+
+// ─── ServiceArea ──────────────────────────────────────────────────────────────
+
+model ServiceArea {
+  id        String   @id @default(cuid())
+  cityName  String   @unique
+  region    String
+  lat       Float
+  lng       Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@map("service_areas")
+}
+
+// ─── SiteContent ─────────────────────────────────────────────────────────────
+
+model SiteContent {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  label     String
+  group     String
+  type      String   @default("text")
+  updatedAt DateTime @updatedAt
+
+  @@map("site_content")
+}
+
+// ─── Branch ───────────────────────────────────────────────────────────────────
+
+model Branch {
+  id        String    @id @default(cuid())
+  name      String
+  address   String
+  city      String
+  region    String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  counters  Counter[]
+  @@map("branches")
+}
+
+// ─── Counter ──────────────────────────────────────────────────────────────────
+
+model Counter {
+  id           String        @id @default(cuid())
+  branchId     String
+  name         String
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  branch       Branch        @relation(fields: [branchId], references: [id])
+  cashSessions CashSession[]
+  shipments    Shipment[]
+  @@map("counters")
+}
+
+// ─── CashSession ──────────────────────────────────────────────────────────────
+
+model CashSession {
+  id             String    @id @default(cuid())
+  counterId      String
+  staffId        String
+  openingBalance Decimal   @db.Decimal(12, 2)
+  closingBalance Decimal?  @db.Decimal(12, 2)
+  cashReceived   Decimal   @default(0) @db.Decimal(12, 2)
+  variance       Decimal?  @db.Decimal(12, 2)
+  notes          String?
+  openedAt       DateTime  @default(now())
+  closedAt       DateTime?
+  counter        Counter   @relation(fields: [counterId], references: [id])
+  staff          User      @relation("StaffCashSessions", fields: [staffId], references: [id])
+  shipments      Shipment[]
+  @@map("cash_sessions")
+}
+
+// ─── AuditLog ─────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String
+  oldValue   Json?
+  newValue   Json?
+  reason     String?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+  @@map("audit_logs")
+}
+
+// ─── BulkUpload ───────────────────────────────────────────────────────────────
+
+model BulkUpload {
+  id               String       @id @default(cuid())
+  businessClientId String
+  userId           String
+  filename         String
+  originalName     String
+  totalRows        Int          @default(0)
+  successRows      Int          @default(0)
+  errorRows        Int          @default(0)
+  errorDetails     Json?
+  status           UploadStatus @default(PROCESSING)
+  createdAt        DateTime     @default(now())
+
+  businessClient BusinessClient @relation(fields: [businessClientId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id])
+  shipments      Shipment[]
+
+  @@map("bulk_uploads")
+}

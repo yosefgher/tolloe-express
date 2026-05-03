@@ -1,0 +1,35 @@
+'use client';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import CounterSidebar from '@/components/layout/CounterSidebar';
+import { useAuthStore } from '@/store/authStore';
+import { api } from '@/lib/api';
+
+export default function CounterLayout({ children }: { children: React.ReactNode }) {
+  const { user, setAuth, clearAuth } = useAuthStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!user) {
+      api.post('/auth/refresh').then(res => {
+        const token = res.data.data.accessToken;
+        return api.get('/auth/me').then(meRes => setAuth(meRes.data.data, token));
+      }).catch(() => { clearAuth(); router.push('/login?redirect=/counter'); });
+    } else if (!['ADMIN', 'SUPERVISOR', 'STAFF'].includes(user.role)) {
+      router.push('/dashboard');
+    }
+  }, []);
+
+  if (!user) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-900">
+      <div className="w-8 h-8 border-2 border-brand-700 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-gray-50">
+      <div className="hidden md:block"><CounterSidebar /></div>
+      <main className="flex-1 overflow-auto">{children}</main>
+    </div>
+  );
+}
